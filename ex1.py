@@ -1,0 +1,210 @@
+import pandas as pd
+import numpy as np
+import re
+import string
+import nltk
+import seaborn as sns
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score 
+from sklearn.metrics import classification_report
+from sklearn.model_selection import learning_curve
+#from textblob import TextBlob
+import matplotlib.pyplot as plt
+#from symspellpy import SymSpell, Verbosity
+#import pkg_resources
+from nltk.tokenize import word_tokenize
+from collections import Counter
+from sklearn.model_selection import cross_val_score
+
+
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('punkt_tab')
+nltk.download('punkt')
+
+stop_words = set(stopwords.words('english'))  
+lemmatizer = WordNetLemmatizer()
+
+#accuracy at 0.76 does not improve plus it takes so much time 
+'''
+sym_spell = SymSpell(max_dictionary_edit_distance=2, prefix_length=7)
+dictionary_path = pkg_resources.resource_filename(
+    "symspellpy", "frequency_dictionary_en_82_765.txt"
+)
+sym_spell.load_dictionary(dictionary_path, term_index=0, count_index=1)
+'''
+
+'''
+data = {
+    "text" : [
+        "I luv this movie!",
+        "Terible film",
+        "The film was awesome"
+    ],
+    "label": [1,0,1]
+}
+
+df = pd.DataFrame(data)
+'''
+
+
+df = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-homework-1/train_dataset.csv")
+df.rename(columns={"Text": "text"}, inplace=True)
+df.rename(columns={"Label": "label"}, inplace=True)
+
+df_test = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-homework-1/test_dataset.csv")
+df_test.rename(columns={"Text": "text"}, inplace=True)
+
+
+#exploratory data analysis
+print(df.describe())
+sns.countplot(x='label', data=df)
+plt.title("Class Distribution")
+plt.show()
+
+
+positive_words = " ".join(df[df["label"] == 1]["text"]).split()
+negative_words = " ".join(df[df["label"] == 0]["text"]).split()
+
+#count frequency 
+pos_counts = Counter(positive_words)
+neg_counts = Counter(negative_words)
+
+pos_common = pos_counts.most_common(20)
+neg_common = neg_counts.most_common(20)
+
+pos_df = pd.DataFrame(pos_common, columns=["Word", "Count"])
+neg_df = pd.DataFrame(neg_common, columns=["Word", "Count"])
+
+fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+
+#positive
+axes[0].barh(pos_df["Word"], pos_df["Count"], color="green")
+axes[0].invert_yaxis()  
+axes[0].set_title("20 positive words")
+axes[0].set_xlabel("Frequency")
+
+#negative
+axes[1].barh(neg_df["Word"], neg_df["Count"], color="red")
+axes[1].invert_yaxis()
+axes[1].set_title("20 negative words")
+axes[1].set_xlabel("Frequency")
+
+plt.tight_layout()
+plt.show()
+
+
+#takes too much time 
+'''
+def correct_spelling(text):
+    blob = TextBlob(text)
+    return str(blob.correct())
+'''
+'''
+def correct_spelling(text):
+    suggestions = sym_spell.lookup_compound(text, max_edit_distance=2)
+    return suggestions[0].term if suggestions else text
+'''
+
+def lemmatize_text(tokens):
+    return [lemmatizer.lemmatize(word) for word in tokens]
+
+def preprocess_text(text):
+    if isinstance(text, str):
+        #lowercasing
+        text = text.lower()
+        
+        #removing special characters,numbers and extra spacing
+        text = re.sub(r"[^\w\s]", "", text)
+        text = re.sub(r'\d+', '', text)
+        text = re.sub(r'\s+', ' ', text).strip()
+
+        #tokenization
+        #tokens = text.split()  
+        tokens = word_tokenize(text)
+
+        #stopwords removal
+        tokens = [word for word in tokens if word not in stop_words]
+
+        #lemmatization
+        tokens = lemmatize_text(tokens)
+
+        return " ".join(tokens)
+
+#df['text'] = df['text'].apply(correct_spelling)
+#df_test['text'] = df_test['text'].apply(correct_spelling)
+#df['text'] = df['text'].apply(lambda x: correct_spelling(str(x)))
+#df_test['text'] = df_test['text'].apply(lambda x: correct_spelling(str(x)))
+df["text"] = df["text"].apply(preprocess_text)    
+#print(df.head())
+
+
+#splitting the data set
+X_train, X_test, y_train, y_test = train_test_split(df["text"], df["label"], test_size=0.2, random_state=42)
+
+#TF-IDF Method 
+#preprocessed all the words in order to improve the method 
+#converting to lowercase, removing stopwords, removing special characters can improve the process
+vectorizer = TfidfVectorizer()
+X_train_tfidf = vectorizer.fit_transform(X_train)  
+X_test_tfidf = vectorizer.transform(X_test)
+
+
+
+#train logistic regression model
+model = LogisticRegression()
+model.fit(X_train_tfidf,y_train)
+
+#predictions
+y_pred = model.predict(X_test_tfidf)
+
+#evaluation 
+accuracy = accuracy_score(y_test,y_pred)
+print(f"Accuracy: {accuracy: .2f}")
+print("Classification Report: \n ", classification_report(y_test,y_pred))
+
+cv_scores = cross_val_score(model, X_train_tfidf, y_train, cv=5, scoring="accuracy")
+print(f"Cross-validation Accuracy: {np.mean(cv_scores):.2f} ± {np.std(cv_scores):.2f}")
+
+#test data set
+
+#df_test.rename(columns={"Text": "text"}, inplace=True)
+
+df_test["text"] = df_test["text"].apply(preprocess_text)
+
+X_test_tfidf = vectorizer.transform(df_test["text"])
+
+y_test_pred = model.predict(X_test_tfidf)
+
+df_test["predicted_label"] = y_test_pred
+
+df_test_output = df_test[["ID", "predicted_label"]]
+df_test_output.to_csv("/home/erginadimitraina/AI2/test_results.csv", index=False)
+
+
+#generate learning curve
+train_sizes, train_scores, test_scores = learning_curve(LogisticRegression(),X_train_tfidf,y_train,cv=2,scoring="accuracy", train_sizes = np.linspace(0.1, 1.0, 10))
+
+#compute mean and std of accuracy
+train_mean = np.mean(train_scores, axis=1)
+train_std = np.std(train_scores, axis=1)
+test_mean = np.mean(test_scores, axis=1)
+test_std = np.std(test_scores, axis=1)
+
+#plot learning curve 
+plt.figure(figsize=(8,6))
+plt.plot(train_sizes,train_mean, label="Training Score", color = "blue", marker="o")
+plt.fill_between(train_sizes,train_mean - train_std, train_mean + train_std, alpha = 0.1, color = "blue")
+
+plt.plot(train_sizes,test_mean, label="Validation Score", color = "red", marker="o")
+plt.fill_between(train_sizes,test_mean - test_std, test_mean + test_std, alpha = 0.1, color = "red")
+
+plt.xlabel("Training Size")
+plt.ylabel("Accuracy")
+plt.title("Learning Curve For Logistic Regression")
+plt.legend()
+plt.show()
