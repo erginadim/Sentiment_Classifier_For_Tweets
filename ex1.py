@@ -7,6 +7,7 @@ import seaborn as sns
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import  GridSearchCV
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score 
@@ -52,13 +53,15 @@ df = pd.DataFrame(data)
 
 
 df = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-homework-1/train_dataset.csv")
-df.rename(columns={"Text": "text"}, inplace=True)
-df.rename(columns={"Label": "label"}, inplace=True)
+df.rename(columns={"Text": "text", "Label": "label"}, inplace=True)
 
 df_test = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-homework-1/test_dataset.csv")
 df_test.rename(columns={"Text": "text"}, inplace=True)
 
+df_val = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-homework-1/val_dataset.csv")
+df_val.rename(columns={"Text": "text", "Label": "label"}, inplace=True)
 
+'''
 #exploratory data analysis
 print(df.describe())
 sns.countplot(x='label', data=df)
@@ -106,7 +109,7 @@ plt.xlabel('Average Number of Words')
 plt.ylabel('Sentiment')
 plt.title('Average Word Count in Positive and Negative Reviews')
 plt.show()
-
+'''
 #takes too much time 
 '''
 def correct_spelling(text):
@@ -178,15 +181,22 @@ vectorizer = TfidfVectorizer(
     )
 X_train_tfidf = vectorizer.fit_transform(X_train)  
 X_test_tfidf = vectorizer.transform(X_test)
+X_val_tfidf = vectorizer.transform(df_val["text"])
 
+#hyperparameter tuning with GridSearchCV
+param_grid = {"C": [0.01, 0.1, 1, 10]}
+grid_search = GridSearchCV(LogisticRegression(), param_grid, cv=5, scoring="accuracy")
+grid_search.fit(X_train_tfidf, y_train)
+print(f"Best Hyperparameter: {grid_search.best_params_}")
 
-
+'''
 #train logistic regression model
 model = LogisticRegression()
 model.fit(X_train_tfidf,y_train)
 
 #predictions
 y_pred = model.predict(X_test_tfidf)
+
 
 #evaluation 
 accuracy = accuracy_score(y_test,y_pred)
@@ -195,6 +205,20 @@ print("Classification Report: \n ", classification_report(y_test,y_pred))
 
 cv_scores = cross_val_score(model, X_train_tfidf, y_train, cv=5, scoring="accuracy")
 print(f"Cross-validation Accuracy: {np.mean(cv_scores):.2f} ± {np.std(cv_scores):.2f}")
+'''
+
+# Train best model
+best_model = grid_search.best_estimator_
+y_pred = best_model.predict(X_test_tfidf)
+
+test_accuracy = accuracy_score(y_test, y_pred)
+print(f"Test Accuracy: {test_accuracy:.2f}")
+print("Classification Report: \n", classification_report(y_test, y_pred))
+
+# Validate model on validation set
+val_pred = best_model.predict(X_val_tfidf)
+val_accuracy = accuracy_score(df_val["label"], val_pred)
+print(f"Validation Accuracy: {val_accuracy:.2f}")
 
 #test data set
 
@@ -204,7 +228,7 @@ df_test["text"] = df_test["text"].apply(preprocess_text)
 
 X_test_tfidf = vectorizer.transform(df_test["text"])
 
-y_test_pred = model.predict(X_test_tfidf)
+y_test_pred = best_model.predict(X_test_tfidf)
 
 df_test["predicted_label"] = y_test_pred
 
@@ -234,3 +258,4 @@ plt.ylabel("Accuracy")
 plt.title("Learning Curve For Logistic Regression")
 plt.legend()
 plt.show() 
+
