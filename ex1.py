@@ -7,6 +7,7 @@ import seaborn as sns
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score 
@@ -23,7 +24,6 @@ from sklearn.model_selection import cross_val_score
 
 nltk.download('stopwords')
 nltk.download('wordnet')
-nltk.download('punkt_tab')
 nltk.download('punkt')
 
 stop_words = set(stopwords.words('english'))  
@@ -51,7 +51,7 @@ data = {
 df = pd.DataFrame(data)
 '''
 
-
+#load the data
 df = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-homework-1/train_dataset.csv")
 df.rename(columns={"Text": "text"}, inplace=True)
 df.rename(columns={"Label": "label"}, inplace=True)
@@ -59,6 +59,9 @@ df.rename(columns={"Label": "label"}, inplace=True)
 df_test = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-homework-1/test_dataset.csv")
 df_test.rename(columns={"Text": "text"}, inplace=True)
 
+df_val = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-homework-1/val_dataset.csv")
+df_val.rename(columns={"Text": "text"}, inplace=True)
+df_val.rename(columns={"Label": "label"}, inplace=True)
 
 #exploratory data analysis
 print(df.describe())
@@ -97,6 +100,16 @@ axes[1].set_xlabel("Frequency")
 plt.tight_layout()
 plt.show()
 
+avg_pos_words = df[df["label"] == 1]["text"].apply(lambda x: len(x.split())).mean()
+avg_neg_words = df[df["label"] == 0]["text"].apply(lambda x: len(x.split())).mean()
+
+plt.figure(figsize=(10, 4))
+plt.barh(['Positive', 'Negative'], [avg_pos_words, avg_neg_words], height=0.5, color=['blue', 'red'])
+plt.xticks(np.arange(0, max(avg_pos_words, avg_neg_words) + 10, 10))  
+plt.xlabel('Average Number of Words')
+plt.ylabel('Sentiment')
+plt.title('Average Word Count in Positive and Negative Reviews')
+plt.show()
 
 #takes too much time 
 '''
@@ -113,8 +126,16 @@ def correct_spelling(text):
 def lemmatize_text(tokens):
     return [lemmatizer.lemmatize(word) for word in tokens]
 
+
+re_negation = re.compile(r"n't\b")
+
+def negation_abbreviated_to_standard(sent):
+    return re_negation.sub(" not", sent)
+
 def preprocess_text(text):
     if isinstance(text, str):
+        text = negation_abbreviated_to_standard(text)
+
         #lowercasing
         text = text.lower()
         
@@ -122,6 +143,8 @@ def preprocess_text(text):
         text = re.sub(r"[^\w\s]", "", text)
         text = re.sub(r'\d+', '', text)
         text = re.sub(r'\s+', ' ', text).strip()
+        patern = r'[^a-zA-Z\s]'
+        text = re.sub(patern,'',text)
 
         #tokenization
         #tokens = text.split()  
@@ -134,13 +157,20 @@ def preprocess_text(text):
         tokens = lemmatize_text(tokens)
 
         return " ".join(tokens)
+    return string
 
 #df['text'] = df['text'].apply(correct_spelling)
 #df_test['text'] = df_test['text'].apply(correct_spelling)
 #df['text'] = df['text'].apply(lambda x: correct_spelling(str(x)))
 #df_test['text'] = df_test['text'].apply(lambda x: correct_spelling(str(x)))
-df["text"] = df["text"].apply(preprocess_text)    
-#print(df.head())
+
+#df["text"] = df["text"].apply(preprocess_text)    
+
+#apply preprocessing
+df["text"] = df["text"].apply(preprocess_text)
+df_test["text"] = df_test["text"].apply(preprocess_text)
+df_val["text"] = df_val["text"].apply(preprocess_text)
+
 
 
 #splitting the data set
@@ -149,16 +179,28 @@ X_train, X_test, y_train, y_test = train_test_split(df["text"], df["label"], tes
 #TF-IDF Method 
 #preprocessed all the words in order to improve the method 
 #converting to lowercase, removing stopwords, removing special characters can improve the process
-vectorizer = TfidfVectorizer()
-X_train_tfidf = vectorizer.fit_transform(X_train)  
+vectorizer = TfidfVectorizer(
+    max_df=0.8,  #ignore the words that appear 90% in the texts 
+    min_df=5,  #ignore the words that appear at most 5 times in the texts
+    ngram_range=(1,2),  #bigram
+    #stop_words="english"
+    )
+X_train_tfidf = vectorizer.fit_transform(X_train)
 X_test_tfidf = vectorizer.transform(X_test)
+X_val_tfidf = vectorizer.transform(df_val["text"])
 
+# Hyperparameter tuning with GridSearchCV
+param_grid = {"C": [0.01, 0.1, 1, 10]}
+grid_search = GridSearchCV(LogisticRegression(), param_grid, cv=5, scoring="accuracy")
+grid_search.fit(X_train_tfidf, y_train)
+print(f"Best Hyperparameter: {grid_search.best_params_}")
 
 
 #train logistic regression model
 model = LogisticRegression()
 model.fit(X_train_tfidf,y_train)
 
+best_model = grid_search.best_estimator_
 #predictions
 y_pred = model.predict(X_test_tfidf)
 
@@ -170,18 +212,22 @@ print("Classification Report: \n ", classification_report(y_test,y_pred))
 cv_scores = cross_val_score(model, X_train_tfidf, y_train, cv=5, scoring="accuracy")
 print(f"Cross-validation Accuracy: {np.mean(cv_scores):.2f} ± {np.std(cv_scores):.2f}")
 
+
+# Validate model on validation set
+val_pred = best_model.predict(X_val_tfidf)
+val_accuracy = accuracy_score(df_val["label"], val_pred)
+print(f"Validation Accuracy: {val_accuracy:.2f}")
+
+
 #test data set
 
 #df_test.rename(columns={"Text": "text"}, inplace=True)
 
-df_test["text"] = df_test["text"].apply(preprocess_text)
+#df_test["text"] = df_test["text"].apply(preprocess_text)
 
 X_test_tfidf = vectorizer.transform(df_test["text"])
-
 y_test_pred = model.predict(X_test_tfidf)
-
 df_test["predicted_label"] = y_test_pred
-
 df_test_output = df_test[["ID", "predicted_label"]]
 df_test_output.to_csv("/home/erginadimitraina/AI2/test_results.csv", index=False)
 
