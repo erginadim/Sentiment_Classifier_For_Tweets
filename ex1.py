@@ -5,7 +5,7 @@ import string
 import nltk
 import seaborn as sns
 import random
-from nltk.corpus import stopwords
+from nltk.corpus import stopwords,opinion_lexicon
 from nltk.stem import WordNetLemmatizer
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import  GridSearchCV
@@ -25,14 +25,18 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import GridSearchCV ,StratifiedKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_curve, auc
+from wordcloud import WordCloud
+from sklearn.feature_extraction.text import CountVectorizer
 
 #reproducibility
+#this is used, if someone else runs the model it will produce the same results
 random.seed(42)
 np.random.seed(42)
 
 nltk.download('stopwords')
 nltk.download('wordnet')
 nltk.download('punkt')
+nltk.download('opinion_lexicon')
 
 stop_words = set(stopwords.words('english'))  
 lemmatizer = WordNetLemmatizer()
@@ -76,7 +80,7 @@ sns.countplot(x='label', data=df)
 plt.title("Class Distribution")
 plt.show()
 
-
+#before preprocess so the outcome we expect it will be mostly stopwords in both sentiments, which indicates us that stopwords really influence the model 
 positive_words = " ".join(df[df["label"] == 1]["text"]).split()
 negative_words = " ".join(df[df["label"] == 0]["text"]).split()
 
@@ -95,13 +99,13 @@ fig, axes = plt.subplots(1, 2, figsize=(15, 6))
 #positive
 axes[0].barh(pos_df["Word"], pos_df["Count"], color="green")
 axes[0].invert_yaxis()  
-axes[0].set_title("20 positive words")
+axes[0].set_title("20 positive words before the preprocessing")
 axes[0].set_xlabel("Frequency")
 
 #negative
 axes[1].barh(neg_df["Word"], neg_df["Count"], color="red")
 axes[1].invert_yaxis()
-axes[1].set_title("20 negative words")
+axes[1].set_title("20 negative words before the preprocessing")
 axes[1].set_xlabel("Frequency")
 
 plt.tight_layout()
@@ -210,9 +214,10 @@ def preprocess_text(text):
         #lowercasing
         text = text.lower()
         
-        #removing special characters,numbers and extra spacing
+        #removing special characters,numbers,urls and extra spacing
         text = re.sub(r"[^\w\s]", "", text)
         text = re.sub(r'\d+', '', text)
+        text = re.sub(r'http\S+', '', text)
         text = re.sub(r'\s+', ' ', text).strip()
         patern = r'[^a-zA-Z\s]'
         text = re.sub(patern,'',text)
@@ -237,22 +242,96 @@ df["text"] = df["text"].apply(lambda x: preprocess_text(correct_text(x)))
 df_test["text"] = df_test["text"].apply(lambda x: preprocess_text(correct_text(x)))
 df_val["text"] = df_val["text"].apply(lambda x: preprocess_text(correct_text(x)))
 
+#after the preprocess I plot the most common positive and negative words 
+all_words = " ".join(df["text"]).split()
+word_counts = Counter(all_words)  # Υπολογισμός συχνότητας λέξεων
 
-#splitting the data set
+# Φιλτράρισμα θετικών και αρνητικών λέξεων
+positive_lexicon = set(opinion_lexicon.positive())  # Θετικές λέξεις από opinion lexicon
+negative_lexicon = set(opinion_lexicon.negative())  # Αρνητικές λέξεις από opinion lexicon
+
+positive_words = {word: count for word, count in word_counts.items() if word in positive_lexicon}
+negative_words = {word: count for word, count in word_counts.items() if word in negative_lexicon}
+
+# Επιλογή των 20 πιο συχνών λέξεων
+pos_common = Counter(positive_words).most_common(20)
+neg_common = Counter(negative_words).most_common(20)
+
+# Μετατροπή σε DataFrame για plotting
+pos_df = pd.DataFrame(pos_common, columns=["Word", "Count"])
+neg_df = pd.DataFrame(neg_common, columns=["Word", "Count"])
+
+# Δημιουργία των γραφημάτων
+fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+
+# Θετικές λέξεις
+axes[0].barh(pos_df["Word"], pos_df["Count"], color="green")
+axes[0].invert_yaxis()  
+axes[0].set_title("20 Most Common Positive Words After Preprocessing")
+axes[0].set_xlabel("Frequency")
+
+# Αρνητικές λέξεις
+axes[1].barh(neg_df["Word"], neg_df["Count"], color="red")
+axes[1].invert_yaxis()
+axes[1].set_title("20 Most Common Negative Words After Preprocessing")
+axes[1].set_xlabel("Frequency")
+
+plt.tight_layout()
+plt.show()
+
+'''
+#word cloud 
+pos_text = " ".join(df[df["label"] == 1]["text"])
+wordcloud = WordCloud(width=800, height=400, background_color='white').generate(pos_text)
+plt.figure(figsize=(10, 5))
+plt.imshow(wordcloud, interpolation="bilinear")
+plt.axis("off")
+plt.title("Most Common Words in Positive Reviews")
+plt.show()
+
+
+neg_text = " ".join(df[df["label"] == 0]["text"])
+wordcloud = WordCloud(width=800, height=400, background_color='black').generate(neg_text)
+plt.figure(figsize=(10, 5))
+plt.imshow(wordcloud, interpolation="bilinear")
+plt.axis("off")
+plt.title("Most Common Words in Negative Reviews")
+plt.show()
+'''
+
+#pattern detection
+vectorizer = CountVectorizer(ngram_range=(2,2), stop_words='english')
+X = vectorizer.fit_transform(df["text"])
+sum_words = X.sum(axis=0).A1
+
+words_freq = sorted([(word, sum_words[idx]) for word, idx in vectorizer.vocabulary_.items()], key=lambda x: x[1], reverse=True)[:20]
+freq_df = pd.DataFrame(words_freq, columns=['Bigram', 'Count'])
+
+
+plt.figure(figsize=(12, 5))
+plt.barh(freq_df["Bigram"], freq_df["Count"], color='orange')
+plt.xlabel("Frequency")
+plt.ylabel("Bigrams")
+plt.title("Top 20 Most Frequent Bigrams After Preprocessing")
+plt.gca().invert_yaxis()
+plt.show()
+
+#splitting the data set into training and testing
 X_train, X_test, y_train, y_test = train_test_split(df["text"], df["label"], test_size=0.2, random_state=42, stratify=df["label"])
+#splitting the training data set to validation
+X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.1, random_state=42, stratify=y_train)
+
 
 #TF-IDF Method 
-#preprocessed all the words in order to improve the method 
-#converting to lowercase, removing stopwords, removing special characters can improve the process
 vectorizer = TfidfVectorizer(
-    max_df=0.7,  #ignore the words that appear 80% in the texts 
-    min_df=10,  #ignore the words that appear at most 5 times in the texts
+    max_df=0.7,  #ignore the words that appear 70% in the texts 
+    min_df=10,  #ignore the words that appear at most 10 times in the texts
     ngram_range=(1,2),  #bigram
     stop_words="english"
     )
 X_train_tfidf = vectorizer.fit_transform(X_train)  
 X_test_tfidf = vectorizer.transform(X_test)
-X_val_tfidf = vectorizer.transform(df_val["text"])
+X_val_tfidf = vectorizer.transform(X_val)
 
 
 #feature scaling
@@ -262,25 +341,13 @@ X_test_tfidf_scaled = scaler.transform(X_test_tfidf)
 X_val_tfidf_scaled = scaler.transform(X_val_tfidf)
 
 
-#model = LogisticRegression(max_iter=2000, solver='saga', C=1.0, random_state=42)
-#log_reg = LogisticRegression(solver='saga', random_state=42)
-'''
-param_grid = {
-    'C': [0.001, 0.01, 0.1, 1, 10, 100],
-    'solver': ['lbfgs', 'saga'],
-    'max_iter': [500, 1000]
-}
-'''
+
 #hyperparameter with GridSearchCV and Logistic Regreation Model 
 param_grid = {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'solver': ['lbfgs', 'saga'], 'max_iter': [2000, 5000]}
 kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 model = GridSearchCV(LogisticRegression(), param_grid, cv=kfold, scoring='accuracy')
 model.fit(X_train_tfidf_scaled, y_train)
 
-'''
-model = GridSearchCV(LogisticRegression(), param_grid, cv=5, scoring='accuracy')
-model.fit(X_train_tfidf, y_train)
-'''
 
 print(f"Best Parameters: {model.best_params_}")
 
@@ -294,25 +361,21 @@ print(f"Accuracy: {accuracy: .2f}")
 print("Classification Report: \n ", classification_report(y_test,y_pred))
 
 #cross validation accuracy
-cv_scores = cross_val_score(model, X_train_tfidf, y_train, cv=5, scoring="accuracy")
+cv_scores = cross_val_score(model.best_estimator_, X_train_tfidf_scaled, y_train, cv=kfold, scoring="accuracy")
 print(f"Cross-validation Accuracy: {np.mean(cv_scores):.2f} ± {np.std(cv_scores):.2f}")
 
 
 
+df_test["text"] = df_test["text"].apply(preprocess_text)  
+X_test_final_tfidf = vectorizer.transform(df_test["text"])
+X_test_final_tfidf_scaled = scaler.transform(X_test_final_tfidf)
+df_test["predicted_label"] = model.predict(X_test_final_tfidf_scaled)
 
-#test data set
-
-
-
-#df_test["text"] = df_test["text"].apply(preprocess_text)
-#X_test_tfidf = vectorizer.transform(df_test["text"])
-#y_test_pred = model.predict(X_test_tfidf)
-#df_test["predicted_label"] = y_test_pred
-df_test["predicted_label"] = model.predict(vectorizer.transform(df_test["text"]))
 df_test_output = df_test[["ID", "predicted_label"]]
 df_test_output.to_csv("/home/erginadimitraina/AI2/test_results.csv", index=False)
 print(df_test.head())  
 print(df_test.columns)  
+
 
 #confusion matrix
 conf_matrix = confusion_matrix(y_test, y_pred)
@@ -333,8 +396,17 @@ plt.title("ROC Curve")
 plt.legend()
 plt.show()
 
+
 #generate learning curve
-train_sizes, train_scores, test_scores = learning_curve(LogisticRegression(), X_train_tfidf, y_train, cv=kfold, scoring="accuracy", train_sizes=np.linspace(0.1, 1.0, 10))
+train_sizes, train_scores, test_scores = learning_curve(
+    model.best_estimator_, 
+    X_train_tfidf_scaled, 
+    y_train, 
+    cv=kfold, 
+    scoring="accuracy", 
+    train_sizes=np.linspace(0.1, 1.0, 20) 
+)
+
 train_mean, train_std = np.mean(train_scores, axis=1), np.std(train_scores, axis=1)
 test_mean, test_std = np.mean(test_scores, axis=1), np.std(test_scores, axis=1)
 
