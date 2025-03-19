@@ -44,12 +44,36 @@ nltk.download('opinion_lexicon')
 
 #stop_words = set(stopwords.words('english'))  
 lemmatizer = WordNetLemmatizer()
-nlp = spacy.load("en_core_web_sm")
-nltk_stopwords = set(stopwords.words("english"))
-spacy_stopwords = set(nlp.Defaults.stop_words)
-stop_words = nltk_stopwords | spacy_stopwords
-stop_words = {word.lower() for word in stop_words}
-#stop_words.update(["then", "that"])
+nltk_stopwords = set(stopwords.words('english'))
+custom_stopwords = {
+    "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them", 
+    "my", "your", "his", "her", "its", "our", "their", "mine", "yours", "hers", "ours", "theirs", 
+    "a", "an", "the", 
+    "and", "but", "or", "nor", "for", "so", "yet", "although", "because", "as", "if", "while", "when", "where", "after", "before", "until", "during", "within", "at", "on", "to", "from", "by", "with", "about", "against", "between", "into", "through", "over", "under", "again", "further", "then", "once",  
+    "be", "is", "are", "was", "were", "am", "been", "being", "have", "has", "had", "having", "do", "does", "did", "doing", "a", "i", "the", "in", "that", "this", "to", "of", "at", 
+    "not", "isn't", "aren't", "wasn't", "weren't", "don't", "doesn't", "didn't", "hasn't", "haven't", "hadn't", 
+    "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now", "d", "ll", "m", "o", "re", "ve", "y", "ain", "aren", "couldn't", "didn't", "doesn't", "hadn't", "hasn't", "haven't", "isn't", "ma", "mightn't", "mustn't", "needn't", "shan", "shouldn't", "wasn't", "weren't", "won't", "wouldn't",  
+    "with", "about", "against", "between", "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", "over", "under", "again", "further", "then", "once",  
+    "here", "there", "when", "where", "how", "why", "what", "which", "who", "whom", "whose",  
+    "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don't", "should", "now",  
+    "themselves", "ourselves", "yourselves", "herself", "himself", "itself", "themselves", "whatsoever", "whomever", 
+    "is", "am", "are", "was", "were", "been", "being",  
+    "has", "have", "had",  
+    "will", "would", "shall", "should", "may", "might", "must", "can", "could",  
+    "here", "there", "when", "where", "how", "why", "what", "which", "who", "whom", "whose",  
+    "what", "how", "why", "which", "who", "where", "when"
+    "im", "ive", "youre", "youll", "youd", "hed", "shed", "theyd", "theyll", "theyre", "itll",
+    "dont", "doesnt", "didnt", "wont", "wouldnt", "cant", "couldnt", "shouldnt", "havent", "hasnt",
+    "aint", "arent", "isnt", "wasnt", "werent", "wheres", "whens", "whos", "whys", "hows", "ok",
+    "yeah", "uh", "um", "gonna", "gotta", "wanna", "lemme", "dunno", "coz", "cause", "nah", "yep",
+    "huh", "oh", "ah", "hey", "hi", "hello", "bye", "goodbye", "okey", "okay", "alright", "hmm",
+    "tbh", "btw", "lol", "omg", "brb", "u", "ur", "thats", "theres", "heres", "whats", "wheres",
+    "guy", "guys", "thing", "things", "stuff", "yeah", "ya", "na", "hahah", "hahaha", "hahahaha",
+    "wa", "wo", "yo", "holla", "dude", "bro", "sis", "man", "woman", "mr", "mrs", "ms", "miss",
+    "thing", "stuff", "someone", "somebody", "everybody", "anybody", "nobody"
+}
+
+stop_words = nltk_stopwords | custom_stopwords
 
 #accuracy at 0.76 does not improve plus it takes so much time 
 '''
@@ -187,8 +211,9 @@ corrections = {
     "one": " ",
     "got": " ",
     "going": " ",
-    "youre":"you are"
-    }
+    "youre":"you are",
+    "amp": " "
+}
 
 def correct_text(text):
     if not isinstance(text, str):
@@ -208,9 +233,6 @@ def negation_abbreviated_to_standard(sent):
     return re_negation.sub(" not", sent)
 
 
-
-
-
 def preprocess_text(text):
     if not isinstance(text, str):
         return ""
@@ -220,10 +242,11 @@ def preprocess_text(text):
     text = re.sub(r"\d+", "", text)  #numbers
     text = re.sub(r"\s+", " ", text).strip()  #spaces
 
-    #spaCy for tokenization + lemmatization
-    doc = nlp(text)
-    tokens = [token.lemma_ for token in doc if token.is_alpha and token.text not in stop_words]
-
+    tokens = word_tokenize(text)  
+    tokens = [word for word in tokens if word not in stop_words]  
+    tokens = [word for word in tokens if len(word) > 2]  
+    tokens = [lemmatizer.lemmatize(word) for word in tokens]  
+    
     return " ".join(tokens)
 
 #apply preprocessing to the 3 datasets
@@ -316,7 +339,6 @@ X_test_tfidf = vectorizer.transform(X_test)
 X_val_tfidf = vectorizer.transform(X_val)
 
 
-
 #feature scaling
 scaler = StandardScaler(with_mean=False)
 X_train_tfidf_scaled = scaler.fit_transform(X_train_tfidf)
@@ -325,7 +347,7 @@ X_val_tfidf_scaled = scaler.transform(X_val_tfidf)
 
 
 #hyperparameter with GridSearchCV and Logistic Regreation Model 
-param_grid = {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'solver': ['lbfgs', 'saga'], 'max_iter': [2000, 5000]}
+param_grid = {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'solver': ['lbfgs', 'saga'], 'max_iter': [5000, 8000]}
 kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 model = GridSearchCV(LogisticRegression(), param_grid, cv=kfold, scoring='accuracy')
 model.fit(X_train_tfidf_scaled, y_train)
@@ -347,32 +369,15 @@ print("Classification Report: \n ", classification_report(y_test,y_pred))
 cv_scores = cross_val_score(model.best_estimator_, X_train_tfidf_scaled, y_train, cv=kfold, scoring="accuracy")
 print(f"Cross-validation Accuracy: {np.mean(cv_scores):.2f} ± {np.std(cv_scores):.2f}")
 
-'''
-#this is added beacause the word cloud especially on the negative sentiment plots words that do not give information about the sentiment 
-#and they are very neutral e.x. today, tommorw , going etc 
-#thats why i used this part to keep the words that only have a high IDF number in the word cloud and not focus on the ones that do not give a clear sentiment.
-feature_array = np.array(vectorizer.get_feature_names_out())
-idf_values = vectorizer.idf_
-#sort words based on the higher IDF
-sorted_indices = np.argsort(idf_values)[::-1] 
-top_n = 100  
-important_words = feature_array[sorted_indices][:top_n]
-wordcloud = WordCloud(width=800, height=400, background_color="white").generate(" ".join(important_words))
-plt.figure(figsize=(10, 5))
-plt.imshow(wordcloud, interpolation="bilinear")
-plt.axis("off")
-plt.show()
-'''
 
-df_test["text"] = df_test["text"].apply(preprocess_text)  
+#df_test["text"] = df_test["text"].apply(preprocess_text)  
 X_test_final_tfidf = vectorizer.transform(df_test["text"])
 X_test_final_tfidf_scaled = scaler.transform(X_test_final_tfidf)
 df_test["predicted_label"] = model.predict(X_test_final_tfidf_scaled)
 
 df_test_output = df_test[["ID", "predicted_label"]]
 df_test_output.to_csv("/home/erginadimitraina/AI2/test_results.csv", index=False)
-#print(df_test.head())  
-#print(df_test.columns)  
+
 
 '''
 #loss function for overfitting and underfitting
@@ -430,7 +435,7 @@ plt.title("Learning Curve For Logistic Regression")
 plt.legend()
 plt.show()
 
-
+'''
 train_losses = []
 val_losses = []
 train_sizes = np.linspace(0.1, 1.0, 10)
@@ -457,3 +462,4 @@ plt.ylabel("Log Loss")
 plt.title("Training vs Validation Loss")
 plt.legend()
 plt.show()
+'''
