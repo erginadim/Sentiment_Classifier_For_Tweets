@@ -43,7 +43,7 @@ nltk.download('punkt')
 nltk.download('opinion_lexicon')
 
 nltk_stop_words = set(stopwords.words('english'))  
-lemmatizer = WordNetLemmatizer()
+#lemmatizer = WordNetLemmatizer()
 
 #accuracy at 0.76 does not improve plus it takes so much time 
 '''
@@ -65,7 +65,7 @@ df_test.rename(columns={"Text": "text"}, inplace=True)
 df_val = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-homework-1/val_dataset.csv")
 df_val.rename(columns={"Text": "text", "Label": "label"}, inplace=True)
 
-
+'''
 #exploratory data analysis
 #plot some data for better understanding
 print(df.describe())
@@ -115,7 +115,7 @@ plt.ylabel('Sentiment')
 plt.title('Average Word Count in Positive and Negative Reviews')
 plt.show()
 
-
+'''
 #takes too much time 
 '''
 def correct_spelling(text):
@@ -127,7 +127,7 @@ def correct_spelling(text):
     suggestions = sym_spell.lookup_compound(text, max_edit_distance=2)
     return suggestions[0].term if suggestions else text
 '''
-
+'''
 #found most common "slang" words and mistakes
 corrections = {
     "4all": "for all",
@@ -192,11 +192,12 @@ def correct_text(text):
     corrected_words = [corrections.get(word.lower(), word) for word in words]
     
     return " ".join(corrected_words)
-
+'''
+'''
 custom_stopwords = {
     "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them", 
     "my", "your", "his", "her", "its", "our", "their", "mine", "yours", "hers", "ours", "theirs", 
-    "a", "an", "the", 
+    "a", "an", "the", "im"
     "and", "but", "or", "nor", "for", "so", "yet", "although", "because", "as", "if", "while", "when", "where", "after", "before", "until", "during", "within", "at", "on", "to", "from", "by", "with", "about", "against", "between", "into", "through", "over", "under", "again", "further", "then", "once",  
     "be", "is", "are", "was", "were", "am", "been", "being", "have", "has", "had", "having", "do", "does", "did", "doing", "a", "i", "the", "in", "that", "this", "to", "of", "at", 
     "not", "isn't", "aren't", "wasn't", "weren't", "don't", "doesn't", "didn't", "hasn't", "haven't", "hadn't", 
@@ -220,18 +221,23 @@ custom_stopwords = {
     "wa", "wo", "yo", "holla", "dude", "bro", "sis", "man", "woman", "mr", "mrs", "ms", "miss",
     "thing", "stuff", "someone", "somebody", "everybody", "anybody", "nobody"
 }
-stop_words = nltk_stop_words | custom_stopwords
+'''
+custom_stopwords = {
+    "to","I","the","a","my","i","and","is","in","for","of","it","on","have","you","so","me","but","that","not"
+}
+#combined_stop_words = custom_stopwords | nltk_stop_words
 
-def lemmatize_text(tokens):
-    return [lemmatizer.lemmatize(word) for word in tokens]
+#def lemmatize_text(tokens):
+    #return [lemmatizer.lemmatize(word) for word in tokens]
 
+'''
 re_negation = re.compile(r"n't\b")
 
 def negation_abbreviated_to_standard(sent):
     return re_negation.sub(" not", sent)
 
 
-
+'''
 
 
 def preprocess_text(text):
@@ -245,20 +251,26 @@ def preprocess_text(text):
     text = re.sub(r"\s+", " ", text).strip()  #kena
     
     tokens = word_tokenize(text)  
-    tokens = [word for word in tokens if word not in stop_words]  
-    tokens = [word for word in tokens if len(word) > 2]  
-    tokens = [lemmatizer.lemmatize(word) for word in tokens]  
+    #tokens = [word for word in tokens if word not in stop_words]  
+    #tokens = [word for word in tokens if len(word) > 2]  
+    #tokens = [lemmatizer.lemmatize(word) for word in tokens]  
     
     return " ".join(tokens)
 
+
+df["text"] = df["text"].apply(lambda x: preprocess_text(x))
+df_test["text"] = df_test["text"].apply(lambda x: preprocess_text(x))
+df_val["text"] = df_val["text"].apply(lambda x: preprocess_text(x))
+
+'''
 #apply preprocessing to the 3 datasets
 df["text"] = df["text"].apply(lambda x: preprocess_text(correct_text(x)))
 df_test["text"] = df_test["text"].apply(lambda x: preprocess_text(correct_text(x)))
 df_val["text"] = df_val["text"].apply(lambda x: preprocess_text(correct_text(x)))
+'''
 
 
-
-
+'''
 #after the preprocess I plot the most common positive and negative words 
 all_words = " ".join(df["text"]).split()
 word_counts = Counter(all_words) 
@@ -306,8 +318,8 @@ plt.imshow(wordcloud, interpolation="bilinear")
 plt.axis("off")
 plt.title("Most Common Words in Negative Reviews")
 plt.show()
-
-
+'''
+'''
 #pattern detection
 vectorizer = CountVectorizer(ngram_range=(2,2), stop_words='english')
 X = vectorizer.fit_transform(df["text"])
@@ -321,7 +333,7 @@ plt.ylabel("Bigrams")
 plt.title("Top 20 Most Frequent Bigrams After Preprocessing")
 plt.gca().invert_yaxis()
 plt.show()
-
+'''
 
 #splitting the data set into training and testing
 X_train, X_test, y_train, y_test = train_test_split(df["text"], df["label"], test_size=0.2, random_state=42, stratify=df["label"])
@@ -330,32 +342,32 @@ X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.
 
 
 #TF-IDF Method 
-vectorizer = TfidfVectorizer(max_df=0.7, min_df=10, ngram_range=(1,2), stop_words="english")
+vectorizer = TfidfVectorizer(max_df=0.7, min_df=10, ngram_range=(1,2), stop_words=list(custom_stopwords)+ ["english"])
 X_train_tfidf = vectorizer.fit_transform(X_train)  
 X_test_tfidf = vectorizer.transform(X_test)
 X_val_tfidf = vectorizer.transform(X_val)
 
 
-
+'''
 #feature scaling
 scaler = StandardScaler(with_mean=False)
 X_train_tfidf_scaled = scaler.fit_transform(X_train_tfidf)
 X_test_tfidf_scaled = scaler.transform(X_test_tfidf)
 X_val_tfidf_scaled = scaler.transform(X_val_tfidf)
-
+'''
 
 #hyperparameter with GridSearchCV and Logistic Regreation Model 
-param_grid = {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'solver': ['lbfgs', 'saga'], 'max_iter': [9000, 12000]}
+param_grid = {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'solver': ['lbfgs', 'saga'], 'max_iter': [3000, 5000]}
 kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 model = GridSearchCV(LogisticRegression(), param_grid, cv=kfold, scoring='accuracy')
-model.fit(X_test_tfidf_scaled, y_test)
+model.fit(X_train_tfidf, y_train)
 
 
 print(f"Best Parameters: {model.best_params_}")
 
 
 #predictions
-y_pred = model.predict(X_test_tfidf_scaled)
+y_pred = model.predict(X_test_tfidf)
 
 #evaluation 
 accuracy = accuracy_score(y_test,y_pred)
@@ -364,7 +376,7 @@ print("Classification Report: \n ", classification_report(y_test,y_pred))
 
 
 #cross validation accuracy for testing purposes
-cv_scores = cross_val_score(model.best_estimator_, X_train_tfidf_scaled, y_train, cv=kfold, scoring="accuracy")
+cv_scores = cross_val_score(model.best_estimator_, X_train_tfidf, y_train, cv=kfold, scoring="accuracy")
 print(f"Cross-validation Accuracy: {np.mean(cv_scores):.2f} ± {np.std(cv_scores):.2f}")
 
 '''
@@ -386,8 +398,8 @@ plt.show()
 
 df_test["text"] = df_test["text"].apply(preprocess_text)  
 X_test_final_tfidf = vectorizer.transform(df_test["text"])
-X_test_final_tfidf_scaled = scaler.transform(X_test_final_tfidf)
-df_test["predicted_label"] = model.predict(X_test_final_tfidf_scaled)
+#X_test_final_tfidf_scaled = scaler.transform(X_test_final_tfidf)
+df_test["predicted_label"] = model.predict(X_test_final_tfidf)
 
 df_test_output = df_test[["ID", "predicted_label"]]
 df_test_output.to_csv("/home/erginadimitraina/AI2/test_results.csv", index=False)
@@ -405,6 +417,8 @@ val_loss = log_loss(y_val, y_val_probs)
 
 print(f"Train Loss: {train_loss:.4f}")
 print(f"Validation Loss: {val_loss:.4f}")
+'''
+
 '''
 #confusion matrix
 conf_matrix = confusion_matrix(y_test, y_pred)
@@ -476,4 +490,5 @@ plt.xlabel("Training Data Size")
 plt.ylabel("Log Loss")
 plt.title("Training vs Validation Loss")
 plt.legend()
-plt.show()
+plt.show()'
+'''
