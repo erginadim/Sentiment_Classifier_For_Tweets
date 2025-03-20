@@ -148,11 +148,12 @@ corrections = {
     "aint": "is not",
     "dunno": "do not know",
     "lol": "", 
-    "im": " ",
-    "today": " ",
-    "one": " ",
-    "got": " ",
-    "going": " ",
+    "im": "",
+    "today": "",
+    "one": "",
+    "got": "",
+    "going": "",
+    "amp": "",
     "youre":"you are"
     }
 
@@ -167,7 +168,7 @@ def correct_text(text):
 
 
 custom_stopwords = {
-    "to","I","the","a","my","i","and","is","in","for","of","it","on","have","you","so","me","but","that","not","you","with","be","im","now","IM"
+    "to","I","the","a","my","i","and","is","in","for","of","it","on","have","you","so","me","but","that","not","you","with","be","im","now","IM","amp","up","go","get","this","with","just","I'm","was","at","be","out","all","are","work","now","got","do","day","back"
 }
 #combined_stop_words = custom_stopwords | nltk_stop_words
 
@@ -195,29 +196,30 @@ def preprocess_text(text):
     text = re.sub(r"[^\w\s]", "", text)  #simeia stiksis
     text = re.sub(r"\s+", " ", text).strip()  #kena
     
-    tokens = word_tokenize(text)  
+    #tokens = word_tokenize(text)  
     #tokens = [word for word in tokens if word not in stop_words]  
     #tokens = [word for word in tokens if len(word) > 2]  
-    #tokens = [lemmatizer.lemmatize(word) for word in tokens]  
+    #tokens = [lemmatizer.lemmatize(word) for word in tokens] 
+    tokens = text.split()  
+    tokens = [word for word in tokens if word not in custom_stopwords] 
     
     return " ".join(tokens)
 
-
-
+'''
 df["text"] = df["text"].apply(lambda x: preprocess_text(x))
 df_test["text"] = df_test["text"].apply(lambda x: preprocess_text(x))
 df_val["text"] = df_val["text"].apply(lambda x: preprocess_text(x))
+'''
+df["text"] = df["text"].apply(preprocess_text)
+df_test["text"] = df_test["text"].apply(preprocess_text)
+df_val["text"] = df_val["text"].apply(preprocess_text)
 
-'''
-#apply preprocessing to the 3 datasets
-df["text"] = df["text"].apply(lambda x: preprocess_text(correct_text(x)))
-df_test["text"] = df_test["text"].apply(lambda x: preprocess_text(correct_text(x)))
-df_val["text"] = df_val["text"].apply(lambda x: preprocess_text(correct_text(x)))
-'''
+
 
 
 
 #after the preprocess I plot the most common positive and negative words 
+
 all_words = " ".join(df["text"]).split()
 word_counts = Counter(all_words) 
 positive_lexicon = set(opinion_lexicon.positive())  
@@ -286,18 +288,14 @@ X_train, X_test, y_train, y_test = train_test_split(df["text"], df["label"], tes
 #splitting the training data set to validation
 X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.1, random_state=42, stratify=y_train)
 
-vectorizer = TfidfVectorizer(stop_words='english')
-default_stopwords = vectorizer.get_stop_words()
-combined_stopwords = custom_stopwords | default_stopwords
 
-print(list(combined_stopwords))
 #TF-IDF Method 
-vectorizer = TfidfVectorizer(max_df=0.7, min_df=10, ngram_range=(1,2), stop_words=list(combined_stopwords))
+vectorizer = TfidfVectorizer(max_df=0.7, min_df=10, ngram_range=(1,2), stop_words=list(custom_stopwords))
 X_train_tfidf = vectorizer.fit_transform(X_train)  
 X_test_tfidf = vectorizer.transform(X_test)
 X_val_tfidf = vectorizer.transform(X_val)
 
-print(list(custom_stopwords)+ ["english"])
+
 
 '''
 #feature scaling
@@ -318,7 +316,7 @@ print(f"Best Parameters: {model.best_params_}")
 
 
 #predictions
-y_pred = model.predict(X_test_tfidf)
+y_pred = model.predict(X_train_tfidf)
 
 #evaluation 
 accuracy = accuracy_score(y_test,y_pred)
@@ -347,15 +345,13 @@ plt.axis("off")
 plt.show()
 '''
 
-df_test["text"] = df_test["text"].apply(preprocess_text)  
+
 X_test_final_tfidf = vectorizer.transform(df_test["text"])
 #X_test_final_tfidf_scaled = scaler.transform(X_test_final_tfidf)
 df_test["predicted_label"] = model.predict(X_test_final_tfidf)
-
 df_test_output = df_test[["ID", "predicted_label"]]
 df_test_output.to_csv("/home/erginadimitraina/AI2/test_results.csv", index=False)
-#print(df_test.head())  
-#print(df_test.columns)  
+ 
 
 '''
 #loss function for overfitting and underfitting
