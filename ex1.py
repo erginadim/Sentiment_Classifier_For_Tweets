@@ -65,7 +65,7 @@ df_test.rename(columns={"Text": "text"}, inplace=True)
 df_val = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-homework-1/val_dataset.csv")
 df_val.rename(columns={"Text": "text", "Label": "label"}, inplace=True)
 
-'''
+
 #exploratory data analysis
 #plot some data for better understanding
 print(df.describe())
@@ -115,7 +115,7 @@ plt.ylabel('Sentiment')
 plt.title('Average Word Count in Positive and Negative Reviews')
 plt.show()
 
-'''
+
 #takes too much time 
 '''
 def correct_spelling(text):
@@ -127,7 +127,7 @@ def correct_spelling(text):
     suggestions = sym_spell.lookup_compound(text, max_edit_distance=2)
     return suggestions[0].term if suggestions else text
 '''
-'''
+
 #found most common "slang" words and mistakes
 corrections = {
     "4all": "for all",
@@ -148,35 +148,7 @@ corrections = {
     "aint": "is not",
     "dunno": "do not know",
     "lol": "", 
-    "teh": "the",
-    "hte": "the",
-    "jsut": "just",
-    "dont": "don't",
-    "doesnt": "doesn't",
-    "cant": "can't",
-    "wont": "won't",
-    "havent": "haven't",
-    "im": "I'm",
-    "ive": "I've",
-    "its": "it's",
-    "alot": "a lot",
-    "thier": "their",
-    "adress": "address",
-    "occurence": "occurrence",
-    "definately": "definitely",
-    "seperate": "separate",
-    "recieve": "receive",
-    "wierd": "weird",
-    "untill": "until",
-    "loose": "lose",
-    "truely": "truly",
-    "your": "you're",
-    "their": "they're",
-    "there": "their",
-    "then": "than",
-    "could of": "could have",
-    "should of": "should have",
-    "would of": "would have",
+    "im": " ",
     "today": " ",
     "one": " ",
     "got": " ",
@@ -192,38 +164,10 @@ def correct_text(text):
     corrected_words = [corrections.get(word.lower(), word) for word in words]
     
     return " ".join(corrected_words)
-'''
-'''
+
+
 custom_stopwords = {
-    "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us", "them", 
-    "my", "your", "his", "her", "its", "our", "their", "mine", "yours", "hers", "ours", "theirs", 
-    "a", "an", "the", "im"
-    "and", "but", "or", "nor", "for", "so", "yet", "although", "because", "as", "if", "while", "when", "where", "after", "before", "until", "during", "within", "at", "on", "to", "from", "by", "with", "about", "against", "between", "into", "through", "over", "under", "again", "further", "then", "once",  
-    "be", "is", "are", "was", "were", "am", "been", "being", "have", "has", "had", "having", "do", "does", "did", "doing", "a", "i", "the", "in", "that", "this", "to", "of", "at", 
-    "not", "isn't", "aren't", "wasn't", "weren't", "don't", "doesn't", "didn't", "hasn't", "haven't", "hadn't", 
-    "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don", "should", "now", "d", "ll", "m", "o", "re", "ve", "y", "ain", "aren", "couldn't", "didn't", "doesn't", "hadn't", "hasn't", "haven't", "isn't", "ma", "mightn't", "mustn't", "needn't", "shan", "shouldn't", "wasn't", "weren't", "won't", "wouldn't",  
-    "with", "about", "against", "between", "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", "over", "under", "again", "further", "then", "once",  
-    "here", "there", "when", "where", "how", "why", "what", "which", "who", "whom", "whose",  
-    "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don't", "should", "now",  
-    "themselves", "ourselves", "yourselves", "herself", "himself", "itself", "themselves", "whatsoever", "whomever", 
-    "is", "am", "are", "was", "were", "been", "being",  
-    "has", "have", "had",  
-    "will", "would", "shall", "should", "may", "might", "must", "can", "could",  
-    "here", "there", "when", "where", "how", "why", "what", "which", "who", "whom", "whose",  
-    "what", "how", "why", "which", "who", "where", "when"
-    "im", "ive", "youre", "youll", "youd", "hed", "shed", "theyd", "theyll", "theyre", "itll",
-    "dont", "doesnt", "didnt", "wont", "wouldnt", "cant", "couldnt", "shouldnt", "havent", "hasnt",
-    "aint", "arent", "isnt", "wasnt", "werent", "wheres", "whens", "whos", "whys", "hows", "ok",
-    "yeah", "uh", "um", "gonna", "gotta", "wanna", "lemme", "dunno", "coz", "cause", "nah", "yep",
-    "huh", "oh", "ah", "hey", "hi", "hello", "bye", "goodbye", "okey", "okay", "alright", "hmm",
-    "tbh", "btw", "lol", "omg", "brb", "u", "ur", "thats", "theres", "heres", "whats", "wheres",
-    "guy", "guys", "thing", "things", "stuff", "yeah", "ya", "na", "hahah", "hahaha", "hahahaha",
-    "wa", "wo", "yo", "holla", "dude", "bro", "sis", "man", "woman", "mr", "mrs", "ms", "miss",
-    "thing", "stuff", "someone", "somebody", "everybody", "anybody", "nobody"
-}
-'''
-custom_stopwords = {
-    "to","I","the","a","my","i","and","is","in","for","of","it","on","have","you","so","me","but","that","not"
+    "to","I","the","a","my","i","and","is","in","for","of","it","on","have","you","so","me","but","that","not","you","with","be","im","now","IM"
 }
 #combined_stop_words = custom_stopwords | nltk_stop_words
 
@@ -244,6 +188,7 @@ def preprocess_text(text):
     if not isinstance(text, str):  
         return ""  
     
+    text = correct_text(text)
     text = text.lower()  
     text = re.sub(r"http\S+", "", text) #urls
     text = re.sub(r"\d+", "", text)  #numbers
@@ -258,6 +203,7 @@ def preprocess_text(text):
     return " ".join(tokens)
 
 
+
 df["text"] = df["text"].apply(lambda x: preprocess_text(x))
 df_test["text"] = df_test["text"].apply(lambda x: preprocess_text(x))
 df_val["text"] = df_val["text"].apply(lambda x: preprocess_text(x))
@@ -270,7 +216,7 @@ df_val["text"] = df_val["text"].apply(lambda x: preprocess_text(correct_text(x))
 '''
 
 
-'''
+
 #after the preprocess I plot the most common positive and negative words 
 all_words = " ".join(df["text"]).split()
 word_counts = Counter(all_words) 
@@ -318,7 +264,7 @@ plt.imshow(wordcloud, interpolation="bilinear")
 plt.axis("off")
 plt.title("Most Common Words in Negative Reviews")
 plt.show()
-'''
+
 '''
 #pattern detection
 vectorizer = CountVectorizer(ngram_range=(2,2), stop_words='english')
@@ -340,13 +286,18 @@ X_train, X_test, y_train, y_test = train_test_split(df["text"], df["label"], tes
 #splitting the training data set to validation
 X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.1, random_state=42, stratify=y_train)
 
+vectorizer = TfidfVectorizer(stop_words='english')
+default_stopwords = vectorizer.get_stop_words()
+combined_stopwords = custom_stopwords | default_stopwords
 
+print(list(combined_stopwords))
 #TF-IDF Method 
-vectorizer = TfidfVectorizer(max_df=0.7, min_df=10, ngram_range=(1,2), stop_words=list(custom_stopwords)+ ["english"])
+vectorizer = TfidfVectorizer(max_df=0.7, min_df=10, ngram_range=(1,2), stop_words=list(combined_stopwords))
 X_train_tfidf = vectorizer.fit_transform(X_train)  
 X_test_tfidf = vectorizer.transform(X_test)
 X_val_tfidf = vectorizer.transform(X_val)
 
+print(list(custom_stopwords)+ ["english"])
 
 '''
 #feature scaling
