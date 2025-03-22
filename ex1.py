@@ -168,7 +168,9 @@ def correct_text(text):
 
 
 custom_stopwords = {
-    "to","I","the","a","my","i","and","is","in","for","of","it","on","have","you","so","me","but","that","not","you","with","be","im","now","IM","amp","up","go","get","this","with","just","I'm","was","at","be","out","all","are","work","now","got","do","day","back"
+    "to","I","the","a","my","i","and","is","in","for","of","it","on","have","you","so","me",
+    "but","that","not","you","with","be","im","now","IM","amp","up","go","get","this","with",
+    "just","I'm","was","at","be","out","all","are","work","now","got","do","day","back","quot","&amp;"
 }
 #combined_stop_words = custom_stopwords | nltk_stop_words
 
@@ -180,8 +182,6 @@ re_negation = re.compile(r"n't\b")
 
 def negation_abbreviated_to_standard(sent):
     return re_negation.sub(" not", sent)
-
-
 '''
 
 
@@ -189,11 +189,15 @@ def preprocess_text(text):
     if not isinstance(text, str):  
         return ""  
     
+    #text = negation_abbreviated_to_standard(text)
     text = correct_text(text)
     text = text.lower()  
     text = re.sub(r"http\S+", "", text) #urls
     text = re.sub(r"\d+", "", text)  #numbers
     text = re.sub(r"[^\w\s]", "", text)  #simeia stiksis
+    #text = re.sub(r"[~%&$*@^¨;><]", "", text)
+    #text = re.sub(r"[^\w\s!?\']", "", text)
+    #text = re.sub(r"[~%&$*@^¨;><]", "", text)
     text = re.sub(r"\s+", " ", text).strip()  #kena
     
     #tokens = word_tokenize(text)  
@@ -201,20 +205,17 @@ def preprocess_text(text):
     #tokens = [word for word in tokens if len(word) > 2]  
     #tokens = [lemmatizer.lemmatize(word) for word in tokens] 
     tokens = text.split()  
-    tokens = [word for word in tokens if word not in custom_stopwords] 
+    #tokens = [word for word in tokens if word not in custom_stopwords] 
     
     return " ".join(tokens)
+ 
+    
+   
 
-'''
-df["text"] = df["text"].apply(lambda x: preprocess_text(x))
-df_test["text"] = df_test["text"].apply(lambda x: preprocess_text(x))
-df_val["text"] = df_val["text"].apply(lambda x: preprocess_text(x))
-'''
+
 df["text"] = df["text"].apply(preprocess_text)
 df_test["text"] = df_test["text"].apply(preprocess_text)
 df_val["text"] = df_val["text"].apply(preprocess_text)
-
-
 
 
 
@@ -296,7 +297,7 @@ X_test_tfidf = vectorizer.transform(X_test)
 X_val_tfidf = vectorizer.transform(X_val)
 
 
-
+#takes too much time
 '''
 #feature scaling
 scaler = StandardScaler(with_mean=False)
@@ -306,7 +307,7 @@ X_val_tfidf_scaled = scaler.transform(X_val_tfidf)
 '''
 
 #hyperparameter with GridSearchCV and Logistic Regreation Model 
-param_grid = {'C': [0.001, 0.01, 0.1, 1, 10, 100], 'solver': ['lbfgs', 'saga'], 'max_iter': [3000, 5000]}
+param_grid = {'C': [0.01, 0.1, 1, 10], 'solver': ['lbfgs', 'saga'], 'max_iter': [3000]}
 kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 model = GridSearchCV(LogisticRegression(), param_grid, cv=kfold, scoring='accuracy')
 model.fit(X_train_tfidf, y_train)
@@ -315,8 +316,10 @@ model.fit(X_train_tfidf, y_train)
 print(f"Best Parameters: {model.best_params_}")
 
 
+
 #predictions
-y_pred = model.predict(X_train_tfidf)
+y_pred = model.predict(X_test_tfidf)
+
 
 #evaluation 
 accuracy = accuracy_score(y_test,y_pred)
