@@ -29,7 +29,8 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics import log_loss
 import collections
 from sklearn.feature_extraction.text import ENGLISH_STOP_WORDS
-from sklearn.decomposition import TruncatedSVD
+from nltk.stem import PorterStemmer
+
 
 
 #reproducibility
@@ -44,6 +45,7 @@ nltk.download('opinion_lexicon')
 
 nltk_stop_words = set(stopwords.words('english'))  
 #lemmatizer = WordNetLemmatizer()
+stemmer = PorterStemmer()
 
 #accuracy at 0.76 does not improve plus it takes so much time 
 '''
@@ -148,15 +150,19 @@ corrections = {
     "aint": "is not",
     "dunno": "do not know",
     "lol": "", 
+    "LOL": "",
     "im": "",
     "today": "",
     "one": "",
     "got": "",
     "going": "",
     "amp": "",
-    "youre":"you are"
+    "youre":"you are",
+    "haha": "laugh",
+    "ha": "laugh"  
     }
 
+'''
 def correct_text(text):
     if not isinstance(text, str):
         return text  
@@ -166,11 +172,25 @@ def correct_text(text):
     
     return " ".join(corrected_words)
 
+'''
+
+def correct_text(text):
+    if not isinstance(text, str):
+        return ""
+
+    text = text.lower()  # Μετατροπή σε πεζά
+    text = re.sub(r'\b(lol)+\b', 'lol', text)  
+    text = re.sub(r'\b(ha)+\b', 'ha', text)  
+    for word, replacement in corrections.items():
+        text = re.sub(rf"\b{re.escape(word)}\b", replacement, text) 
+
+    return text
 
 custom_stopwords = {
-    "to","I","the","a","my","i","and","is","in","for","of","it","on","have","you","so","me",
-    "but","that","not","you","with","be","im","now","IM","amp","up","go","get","this","with",
-    "just","I'm","was","at","be","out","all","are","work","now","got","do","day","back","quot","&amp;"
+    "to","I","the","a","my","i","and","is","in","for","of","it","on","have","you","so",
+    "me","but","that","not","you","with","be","im","now","IM","amp","up","go","get","this",
+    "with","just","I'm","was","at","be","out","all","are","work","now","got","do","day","back",
+    "your","from"
 }
 #combined_stop_words = custom_stopwords | nltk_stop_words
 
@@ -182,40 +202,49 @@ re_negation = re.compile(r"n't\b")
 
 def negation_abbreviated_to_standard(sent):
     return re_negation.sub(" not", sent)
-'''
 
+
+'''
+'''
+unwanted_chars = r"[~%&$]"
+
+#punctuation that could be important for sentiment analysis
+sentiment_punctuation = ['!', '?', '...', ':-)', ':-(']
+'''
 
 def preprocess_text(text):
     if not isinstance(text, str):  
         return ""  
     
-    #text = negation_abbreviated_to_standard(text)
+    
+    #text = text.lower()  
     text = correct_text(text)
-    text = text.lower()  
     text = re.sub(r"http\S+", "", text) #urls
     text = re.sub(r"\d+", "", text)  #numbers
     text = re.sub(r"[^\w\s]", "", text)  #simeia stiksis
-    #text = re.sub(r"[~%&$*@^¨;><]", "", text)
-    #text = re.sub(r"[^\w\s!?\']", "", text)
-    #text = re.sub(r"[~%&$*@^¨;><]", "", text)
     text = re.sub(r"\s+", " ", text).strip()  #kena
-    
+    '''
+    for punct in sentiment_punctuation:
+        text = text.replace(punct, f" {punct} ")  
+    text = re.sub(r"[^\w\s!?…:-]", "", text)
+    '''
     #tokens = word_tokenize(text)  
     #tokens = [word for word in tokens if word not in stop_words]  
     #tokens = [word for word in tokens if len(word) > 2]  
     #tokens = [lemmatizer.lemmatize(word) for word in tokens] 
     tokens = text.split()  
-    #tokens = [word for word in tokens if word not in custom_stopwords] 
+    tokens = [word for word in tokens if word not in custom_stopwords] 
+    tokens = [stemmer.stem(word) for word in tokens]
     
     return " ".join(tokens)
- 
-    
-   
+
 
 
 df["text"] = df["text"].apply(preprocess_text)
 df_test["text"] = df_test["text"].apply(preprocess_text)
 df_val["text"] = df_val["text"].apply(preprocess_text)
+
+
 
 
 
@@ -268,7 +297,7 @@ plt.axis("off")
 plt.title("Most Common Words in Negative Reviews")
 plt.show()
 
-'''
+
 #pattern detection
 vectorizer = CountVectorizer(ngram_range=(2,2), stop_words='english')
 X = vectorizer.fit_transform(df["text"])
@@ -282,7 +311,7 @@ plt.ylabel("Bigrams")
 plt.title("Top 20 Most Frequent Bigrams After Preprocessing")
 plt.gca().invert_yaxis()
 plt.show()
-'''
+
 
 #splitting the data set into training and testing
 X_train, X_test, y_train, y_test = train_test_split(df["text"], df["label"], test_size=0.2, random_state=42, stratify=df["label"])
@@ -297,7 +326,7 @@ X_test_tfidf = vectorizer.transform(X_test)
 X_val_tfidf = vectorizer.transform(X_val)
 
 
-#takes too much time
+
 '''
 #feature scaling
 scaler = StandardScaler(with_mean=False)
@@ -316,10 +345,8 @@ model.fit(X_train_tfidf, y_train)
 print(f"Best Parameters: {model.best_params_}")
 
 
-
 #predictions
 y_pred = model.predict(X_test_tfidf)
-
 
 #evaluation 
 accuracy = accuracy_score(y_test,y_pred)
@@ -331,35 +358,19 @@ print("Classification Report: \n ", classification_report(y_test,y_pred))
 cv_scores = cross_val_score(model.best_estimator_, X_train_tfidf, y_train, cv=kfold, scoring="accuracy")
 print(f"Cross-validation Accuracy: {np.mean(cv_scores):.2f} ± {np.std(cv_scores):.2f}")
 
-'''
-#this is added beacause the word cloud especially on the negative sentiment plots words that do not give information about the sentiment 
-#and they are very neutral e.x. today, tommorw , going etc 
-#thats why i used this part to keep the words that only have a high IDF number in the word cloud and not focus on the ones that do not give a clear sentiment.
-feature_array = np.array(vectorizer.get_feature_names_out())
-idf_values = vectorizer.idf_
-#sort words based on the higher IDF
-sorted_indices = np.argsort(idf_values)[::-1] 
-top_n = 100  
-important_words = feature_array[sorted_indices][:top_n]
-wordcloud = WordCloud(width=800, height=400, background_color="white").generate(" ".join(important_words))
-plt.figure(figsize=(10, 5))
-plt.imshow(wordcloud, interpolation="bilinear")
-plt.axis("off")
-plt.show()
-'''
 
 
 X_test_final_tfidf = vectorizer.transform(df_test["text"])
 #X_test_final_tfidf_scaled = scaler.transform(X_test_final_tfidf)
 df_test["predicted_label"] = model.predict(X_test_final_tfidf)
 df_test_output = df_test[["ID", "predicted_label"]]
-df_test_output.to_csv("/home/erginadimitraina/AI2/test_results.csv", index=False)
+df_test_output.to_csv("/home/erginadimitraina/AI2/submission.csv", index=False)
  
 
-'''
+
 #loss function for overfitting and underfitting
-y_train_probs = model.predict_proba(X_train_tfidf_scaled)[:, 1]  
-y_val_probs = model.predict_proba(X_val_tfidf_scaled)[:, 1]
+y_train_probs = model.predict_proba(X_train_tfidf)[:, 1]  
+y_val_probs = model.predict_proba(X_val_tfidf)[:, 1]
 
 
 train_loss = log_loss(y_train, y_train_probs)
@@ -367,9 +378,8 @@ val_loss = log_loss(y_val, y_val_probs)
 
 print(f"Train Loss: {train_loss:.4f}")
 print(f"Validation Loss: {val_loss:.4f}")
-'''
 
-'''
+
 #confusion matrix
 conf_matrix = confusion_matrix(y_test, y_pred)
 sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
@@ -379,7 +389,7 @@ plt.title("Confusion Matrix")
 plt.show()
 
 #ROC Curve
-y_scores = model.decision_function(X_test_tfidf_scaled)
+y_scores = model.decision_function(X_test_tfidf)
 fpr, tpr, _ = roc_curve(y_test, y_scores)
 roc_auc = auc(fpr, tpr)
 plt.plot(fpr, tpr, color='blue', label=f'AUC = {roc_auc:.2f}')
@@ -393,7 +403,7 @@ plt.show()
 #generate learning curve
 train_sizes, train_scores, test_scores = learning_curve(
     model.best_estimator_, 
-    X_train_tfidf_scaled, 
+    X_train_tfidf, 
     y_train, 
     cv=kfold, 
     scoring="accuracy", 
@@ -422,14 +432,14 @@ train_sizes = np.linspace(0.1, 1.0, 10)
 best_model = model.best_estimator_  
 
 for size in train_sizes:
-    subset_size = int(size * X_train_tfidf_scaled.shape[0])  # Χρησιμοποιούμε shape[0] αντί για len()
+    subset_size = int(size * X_train_tfidf.shape[0])  # Χρησιμοποιούμε shape[0] αντί για len()
     
-    X_subset, y_subset = X_train_tfidf_scaled[:subset_size], y_train[:subset_size]
+    X_subset, y_subset = X_train_tfidf[:subset_size], y_train[:subset_size]
 
     best_model.fit(X_subset, y_subset)
     
     y_subset_probs = best_model.predict_proba(X_subset)[:, 1]
-    y_val_probs = best_model.predict_proba(X_val_tfidf_scaled)[:, 1]
+    y_val_probs = best_model.predict_proba(X_val_tfidf)[:, 1]
     
     train_losses.append(log_loss(y_subset, y_subset_probs))
     val_losses.append(log_loss(y_val, y_val_probs))
@@ -440,5 +450,4 @@ plt.xlabel("Training Data Size")
 plt.ylabel("Log Loss")
 plt.title("Training vs Validation Loss")
 plt.legend()
-plt.show()'
-'''
+plt.show()
