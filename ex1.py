@@ -33,7 +33,7 @@ from nltk.stem import PorterStemmer
 
 
 
-#reproducibility
+#reproducibility 
 #this is used, if someone else runs the model it will produce the same results
 random.seed(42)
 np.random.seed(42)
