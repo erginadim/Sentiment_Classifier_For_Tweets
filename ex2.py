@@ -218,8 +218,20 @@ print(f"Test Accuracy: {test_acc:.4f}")
 
 #accuracy,precision,recall
 print("Classification Report:")
-print(classification_report(y_test, test_preds.numpy(), digits=4))
+#print(classification_report(y_test, test_preds.numpy(), digits=4))
+print(classification_report(y_test_tensor, test_preds.numpy(), digits=4))
 
+#y_test["predicted_label"] = model_nn.predict(X_test)
+#y_test_tensor["predicted_label"] = model_nn.predict(X_test_tensor)
+#y_test_output = y_test[["ID", "predicted_label"]]
+#y_test_output.to_csv("/home/erginadimitraina/AI2/submission2.csv", index=False)
+
+# Δημιουργία DataFrame για αποθήκευση προβλέψεων
+y_test_output = pd.DataFrame({
+    "ID": y_test.index, 
+    "predicted_label": test_preds.numpy()
+})
+y_test_output.to_csv("/home/erginadimitraina/AI2/submission2.csv", index=False)
 
 
 #PLOTS
