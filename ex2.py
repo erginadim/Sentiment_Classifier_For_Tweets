@@ -12,6 +12,8 @@ import torch
 import torch.nn as nn 
 import matplotlib.pyplot as plt
 import pandas as pd
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
 
 #reproducibility
 random.seed(42)
@@ -28,7 +30,7 @@ df_test.rename(columns={"Text": "text"}, inplace=True)
 df_val = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-homework-1/val_dataset.csv")
 df_val.rename(columns={"Text": "text", "Label": "label"}, inplace=True)
 
-
+#TODO better preprocessing based on the feedback
 #found most common "slang" words and mistakes
 corrections = {
     "4all": "for all",
@@ -118,6 +120,7 @@ df_test["text"] = df_test["text"].apply(preprocess_text)
 df_val["text"] = df_val["text"].apply(preprocess_text)
 
 
+#TODO check tokenization because you tokenize twice once in the preprocess and then here!!
 tokenized_texts = [text.split() for text in df["text"]]
 model = Word2Vec(sentences=tokenized_texts, vector_size=100, window=5, min_count=2, workers=4, sg=1)
 
@@ -140,7 +143,9 @@ def get_average_embedding(text, model, vector_size):
 vector_size = 100  
 
 X_train_embed = np.array([get_average_embedding(text, model, vector_size) for text in X_train])
+
 X_val_embed = np.array([get_average_embedding(text, model, vector_size) for text in X_val])
+
 X_test_embed = np.array([get_average_embedding(text, model, vector_size) for text in X_test])
 
 
@@ -167,41 +172,41 @@ class SentimentClassifier(nn.Module):
         return self.softmax(out)
 
 input_dim = vector_size
-hidden_dim = 128
+#default 128 acc 0.7251, tried 130 acc 0,7264 better diag in 130
+hidden_dim = 130
 output_dim = len(set(df["label"]))
 
 model_nn = SentimentClassifier(input_dim, hidden_dim, output_dim)
 
-#predictions
-#y_pred = model_nn.predict(X_test_tensor)
-
-#evaluation 
-#accuracy = accuracy_score(y_test,y_pred)
-#print(f"Accuracy: {accuracy: .2f}")
 
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model_nn.parameters(), lr=0.001)
 
 #tried 20,30,40,45,50,55 best one 50
 num_epochs=50
+train_losses = []
+val_accuracies = []
 
 for epoch in range(num_epochs):
     model_nn.train()
-    
     optimizer.zero_grad()
+    
     outputs = model_nn(X_train_tensor)
     loss = criterion(outputs, y_train_tensor)
     loss.backward()
     optimizer.step()
+    
+    train_losses.append(loss.item())
 
-    # Validation
+    # Validation accuracy
     model_nn.eval()
     with torch.no_grad():
         val_outputs = model_nn(X_val_tensor)
         val_preds = torch.argmax(val_outputs, dim=1)
-        val_acc = (val_preds == y_val_tensor).sum().item() / len(y_val_tensor)
+        val_acc = (val_preds == y_val_tensor).float().mean().item()
+        val_accuracies.append(val_acc)
+    print(f"Epoch {epoch+1}/{num_epochs} | Loss: {loss.item():.4f} | Val Accuracy: {val_acc:.4f}")
 
-    print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}, Val Accuracy: {val_acc:.4f}")
 
 model_nn.eval()
 with torch.no_grad():
@@ -211,6 +216,45 @@ with torch.no_grad():
 
 print(f"Test Accuracy: {test_acc:.4f}")
 
+#accuracy,precision,recall
+print("Classification Report:")
+print(classification_report(y_test, test_preds.numpy(), digits=4))
+
+
+
+#PLOTS
+
+plt.figure(figsize=(12, 5))
+
+plt.subplot(1, 2, 1)
+plt.plot(train_losses, label='Training Loss')
+plt.title('Training Loss per Epoch')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+
+
+plt.subplot(1, 2, 2)
+plt.plot(val_accuracies, label='Validation Accuracy', color='green')
+plt.title('Validation Accuracy per Epoch')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+
+plt.tight_layout()
+plt.show()
+
+
+conf_mat = confusion_matrix(y_test, test_preds.numpy())
+
+
+plt.figure(figsize=(6, 5))
+sns.heatmap(conf_mat, annot=True, fmt='d', cmap='Blues',xticklabels=np.unique(y_test), yticklabels=np.unique(y_test))
+
+plt.title('Confusion Matrix')
+plt.xlabel('Predicted Labels')
+plt.ylabel('True Labels')
+plt.show()
 #class SentimentClassifier(object):
     
   # constructor
