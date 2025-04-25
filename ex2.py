@@ -227,13 +227,18 @@ print(classification_report(y_test_tensor, test_preds.numpy(), digits=4))
 #y_test_output.to_csv("/home/erginadimitraina/AI2/submission2.csv", index=False)
 
 # Δημιουργία DataFrame για αποθήκευση προβλέψεων
-y_test_output = pd.DataFrame({
-    "ID": y_test.index, 
-    "predicted_label": test_preds.numpy()
+#df_test_output = pd.DataFrame({
+#    "ID": df_test.index, 
+#    "predicted_label": test_preds.numpy()
+#})
+#df_test_output.to_csv("/home/erginadimitraina/AI2/submission2.csv", index=False)
+
+df_test_output = pd.DataFrame({
+    #"ID": df_test.index,
+    "label": test_preds.numpy()
 })
-y_test_output.to_csv("/home/erginadimitraina/AI2/submission2.csv", index=False)
 
-
+df_test_output.to_csv("/home/erginadimitraina/AI2/submission2.csv", index=False)
 #PLOTS
 
 plt.figure(figsize=(12, 5))
