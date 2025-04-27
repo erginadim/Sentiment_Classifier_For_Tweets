@@ -1,3 +1,17 @@
+'''
+EXPERIMENTS
+-> hidden dim try: 64,100,130,160,200,300.
+-> learning rates try:0.01, 0.001, 0.0005
+-> epochs try:20,30,40,45,50,55 best one 50
+-> Data augmentation
+Optimization
+Dropout layer: nn.Dropout(0.3) ανάμεσα στα layers
+early stopping 
+'''
+
+#the programm is not steady 
+
+
 import pandas as pd
 import numpy as np
 import random
@@ -12,12 +26,22 @@ import torch
 import torch.nn as nn 
 import matplotlib.pyplot as plt
 import pandas as pd
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix,roc_curve, auc
 import seaborn as sns
+from langdetect import detect
+from sklearn.utils import resample
+from wordcloud import WordCloud
+from nltk.corpus import opinion_lexicon,words
+from collections import Counter
 
 #reproducibility
 random.seed(42)
 np.random.seed(42)
+torch.manual_seed(42)
+torch.cuda.manual_seed(42)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+#nltk.download('words')
 
 stemmer = PorterStemmer()
 #load datasets
@@ -31,6 +55,8 @@ df_val = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-home
 df_val.rename(columns={"Text": "text", "Label": "label"}, inplace=True)
 
 #TODO better preprocessing based on the feedback
+#I follow the same preprocess as the project 1 but I tried to improve it based on the feedback we got 
+english_words_set = set(words.words())
 #found most common "slang" words and mistakes
 corrections = {
     "4all": "for all",
@@ -60,15 +86,30 @@ corrections = {
     "amp": "",
     "youre":"you are",
     "haha": "laugh",
-    "ha": "laugh"  
+    "ha": "laugh" ,
+    #"quot": ""
     }
 
+'''
+def is_english_word(word):
+    return word in english_words_set
 
+def detect_language(text):
+    try:
+        lang = detect(text)
+        return lang == 'en'
+    except:
+        return False
+'''
 
 def correct_text(text):
     if not isinstance(text, str):
         return ""
 
+    '''
+    if len(text.strip()) == 0 or not detect_language(text):
+        return ""
+    '''
     text = text.lower()  # Μετατροπή σε πεζά
     text = re.sub(r'\b(lol)+\b', 'lol', text)  
     text = re.sub(r'\b(ha)+\b', 'ha', text)  
@@ -112,6 +153,24 @@ def preprocess_text(text):
     
     
     return " ".join(tokens)
+
+
+pos_text = " ".join(df[df["label"] == 1]["text"])
+wordcloud = WordCloud(width=800, height=400, background_color='white').generate(pos_text)
+plt.figure(figsize=(10, 5))
+plt.imshow(wordcloud, interpolation="bilinear")
+plt.axis("off")
+plt.title("Most Common Words in Positive Reviews")
+plt.show()
+
+
+neg_text = " ".join(df[df["label"] == 0]["text"])
+wordcloud = WordCloud(width=800, height=400, background_color='black').generate(neg_text)
+plt.figure(figsize=(10, 5))
+plt.imshow(wordcloud, interpolation="bilinear")
+plt.axis("off")
+plt.title("Most Common Words in Negative Reviews")
+plt.show()
 
 
 
@@ -162,30 +221,39 @@ class SentimentClassifier(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim):
         super(SentimentClassifier, self).__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.dropout = nn.Dropout(0.3)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_dim, output_dim)
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
-        out = self.relu(self.fc1(x))
+        out = self.fc1(x)
+        out = self.relu(out)
+        out = self.dropout(out)
         out = self.fc2(out)
         return self.softmax(out)
 
 input_dim = vector_size
-#default 128 acc 0.7251, tried 130 acc 0,7264 better diag in 130
-hidden_dim = 130
+
+hidden_dim = 150
+
 output_dim = len(set(df["label"]))
 
 model_nn = SentimentClassifier(input_dim, hidden_dim, output_dim)
 
-
+#Optimization
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model_nn.parameters(), lr=0.001)
+optimizer = torch.optim.Adam(model_nn.parameters(), lr=0.01)
+
 
 #tried 20,30,40,45,50,55 best one 50
-num_epochs=50
+num_epochs=60
 train_losses = []
 val_accuracies = []
+#best_val_acc = 0
+#patience_counter = 0
+#patience = 5
+
 
 for epoch in range(num_epochs):
     model_nn.train()
@@ -205,15 +273,28 @@ for epoch in range(num_epochs):
         val_preds = torch.argmax(val_outputs, dim=1)
         val_acc = (val_preds == y_val_tensor).float().mean().item()
         val_accuracies.append(val_acc)
+        #if val_acc > best_val_acc:
+        #    best_val_acc = val_acc
+        #    patience_counter = 0
+        #    best_model_wts = model_nn.state_dict()  
+        #else:
+        #    patience_counter += 1
+    
+        #if patience_counter >= patience:
+        #    print(f"Early stopping at epoch {epoch+1}")
+        #break
     print(f"Epoch {epoch+1}/{num_epochs} | Loss: {loss.item():.4f} | Val Accuracy: {val_acc:.4f}")
 
-
+#model_nn.load_state_dict(best_model_wts)
 model_nn.eval()
 with torch.no_grad():
     test_outputs = model_nn(X_test_tensor)
     test_preds = torch.argmax(test_outputs, dim=1)
     test_acc = (test_preds == y_test_tensor).sum().item() / len(y_test_tensor)
 
+print("Learning Rate:",0.01);
+print("Hidden Dim:",hidden_dim);
+print("Epochs:", num_epochs);
 print(f"Test Accuracy: {test_acc:.4f}")
 
 #accuracy,precision,recall
@@ -241,6 +322,33 @@ df_test_output = pd.DataFrame({
 df_test_output.to_csv("/home/erginadimitraina/AI2/submission2.csv", index=False)
 #PLOTS
 
+all_words = " ".join(df["text"]).split()
+word_counts = Counter(all_words) 
+positive_lexicon = set(opinion_lexicon.positive())  
+negative_lexicon = set(opinion_lexicon.negative())  
+
+positive_words = {word: count for word, count in word_counts.items() if word in positive_lexicon}
+negative_words = {word: count for word, count in word_counts.items() if word in negative_lexicon}
+
+pos_common = Counter(positive_words).most_common(20)
+neg_common = Counter(negative_words).most_common(20)
+
+pos_df = pd.DataFrame(pos_common, columns=["Word", "Count"])
+neg_df = pd.DataFrame(neg_common, columns=["Word", "Count"])
+
+fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+axes[0].barh(pos_df["Word"], pos_df["Count"], color="green")
+axes[0].invert_yaxis()  
+axes[0].set_title("20 Most Common Positive Words After Preprocessing")
+axes[0].set_xlabel("Frequency")
+
+axes[1].barh(neg_df["Word"], neg_df["Count"], color="red")
+axes[1].invert_yaxis()
+axes[1].set_title("20 Most Common Negative Words After Preprocessing")
+axes[1].set_xlabel("Frequency")
+
+plt.tight_layout()
+plt.show()
 plt.figure(figsize=(12, 5))
 
 plt.subplot(1, 2, 1)
@@ -272,6 +380,21 @@ plt.title('Confusion Matrix')
 plt.xlabel('Predicted Labels')
 plt.ylabel('True Labels')
 plt.show()
+
+#ROC Curve
+model_nn.eval()
+with torch.no_grad():
+    y_outputs = model_nn(X_test_tensor)  # Get probabilities
+    y_scores = y_outputs[:, 1].numpy()
+fpr, tpr, _ = roc_curve(y_test, y_scores)
+roc_auc = auc(fpr, tpr)
+plt.plot(fpr, tpr, color='blue', label=f'AUC = {roc_auc:.2f}')
+plt.xlabel("False Positive Rate")
+plt.ylabel("True Positive Rate")
+plt.title("ROC Curve")
+plt.legend()
+plt.show()
+
 #class SentimentClassifier(object):
     
   # constructor
