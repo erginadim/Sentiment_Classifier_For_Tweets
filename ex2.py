@@ -28,11 +28,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.metrics import classification_report, confusion_matrix,roc_curve, auc
 import seaborn as sns
-from langdetect import detect
-from sklearn.utils import resample
 from wordcloud import WordCloud
 from nltk.corpus import opinion_lexicon,words
 from collections import Counter
+from textblob import TextBlob
 
 #reproducibility
 random.seed(42)
@@ -54,7 +53,7 @@ df_test.rename(columns={"Text": "text"}, inplace=True)
 df_val = pd.read_csv("/home/erginadimitraina/AI2/ai-2-deep-learning-for-nlp-homework-1/val_dataset.csv")
 df_val.rename(columns={"Text": "text", "Label": "label"}, inplace=True)
 
-#TODO better preprocessing based on the feedback
+
 #I follow the same preprocess as the project 1 but I tried to improve it based on the feedback we got 
 english_words_set = set(words.words())
 #found most common "slang" words and mistakes
@@ -134,14 +133,20 @@ def preprocess_text(text):
     #text = text.lower()  
     text = correct_text(text)
     text = re.sub(r"http\S+", "", text) #urls
+    text = re.sub(r"www\.[a-z]?\.?(com)+|[a-z]+\.(com)", '', text)
     text = re.sub(r"\d+", "", text)  #numbers
     text = re.sub(r"[^\w\s]", "", text)  #simeia stiksis
     text = re.sub(r"\s+", " ", text).strip()  #kena
+    
+
     '''
     for punct in sentiment_punctuation:
         text = text.replace(punct, f" {punct} ")  
     text = re.sub(r"[^\w\s!?…:-]", "", text)
     '''
+
+    #blob = TextBlob(text)
+    
     #tokens = word_tokenize(text)  
     #tokens = [word for word in tokens if word not in stop_words]  
     #tokens = [word for word in tokens if len(word) > 2]  
@@ -179,7 +184,7 @@ df_test["text"] = df_test["text"].apply(preprocess_text)
 df_val["text"] = df_val["text"].apply(preprocess_text)
 
 
-#TODO check tokenization because you tokenize twice once in the preprocess and then here!!
+
 tokenized_texts = [text.split() for text in df["text"]]
 model = Word2Vec(sentences=tokenized_texts, vector_size=100, window=5, min_count=2, workers=4, sg=1)
 
@@ -224,14 +229,14 @@ class SentimentClassifier(nn.Module):
         self.dropout = nn.Dropout(0.3)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_dim, output_dim)
-        self.softmax = nn.Softmax(dim=1)
+        #self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         out = self.fc1(x)
         out = self.relu(out)
         out = self.dropout(out)
         out = self.fc2(out)
-        return self.softmax(out)
+        return out
 
 input_dim = vector_size
 
@@ -286,6 +291,7 @@ for epoch in range(num_epochs):
     print(f"Epoch {epoch+1}/{num_epochs} | Loss: {loss.item():.4f} | Val Accuracy: {val_acc:.4f}")
 
 #model_nn.load_state_dict(best_model_wts)
+
 model_nn.eval()
 with torch.no_grad():
     test_outputs = model_nn(X_test_tensor)
@@ -314,12 +320,30 @@ print(classification_report(y_test_tensor, test_preds.numpy(), digits=4))
 #})
 #df_test_output.to_csv("/home/erginadimitraina/AI2/submission2.csv", index=False)
 
+'''
 df_test_output = pd.DataFrame({
-    #"ID": df_test.index,
-    "label": test_preds.numpy()
+    "ID": X_test_tensor,
+    "predicted_label": test_preds.numpy()
+})
+'''
+df_test_embed = np.array([get_average_embedding(text, model, vector_size) for text in df_test["text"]])
+df_test_tensor = torch.tensor(df_test_embed, dtype=torch.float32)
+
+# Predict
+model_nn.eval()
+with torch.no_grad():
+    outputs = model_nn(df_test_tensor)
+    predictions = torch.argmax(outputs, dim=1)
+
+# Δημιουργία DataFrame για το submission
+df_submission = pd.DataFrame({
+    "ID": df_test["ID"],  # προϋπόθεση: df_test έχει στήλη ID
+    "predicted_label": predictions.numpy()
 })
 
-df_test_output.to_csv("/home/erginadimitraina/AI2/submission2.csv", index=False)
+df_submission.to_csv("/home/erginadimitraina/AI2/submission2.csv", index=False)
+
+
 #PLOTS
 
 all_words = " ".join(df["text"]).split()
@@ -395,17 +419,3 @@ plt.title("ROC Curve")
 plt.legend()
 plt.show()
 
-#class SentimentClassifier(object):
-    
-  # constructor
- # def __init__(self, x, y, z):
-  #  self.x = x
-   # self.y = y
-   # self.z = z
-
-  # calculate the forward path
-  #def forward(self):
-   # self.a = self.relu(self.x)
-   # self.b = self.y()
-   # self.f = self.a * self.b
-   # return f
